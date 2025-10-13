@@ -80,6 +80,7 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/",
                     "/static/**",
+                    "/assets/**",
                     "/uploads/**",
                     "/api/stores/**",
                     "/admin/login",

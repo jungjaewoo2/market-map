@@ -51,9 +51,9 @@ function initializeMap() {
     canvas.addEventListener('wheel', handleZoom);
     
     // 모바일 터치 이벤트 추가
-    canvas.addEventListener('touchstart', handleTouchStart);
-    canvas.addEventListener('touchmove', handleTouchMove);
-    canvas.addEventListener('touchend', handleTouchEnd);
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
     
     // 리사이즈 이벤트
     window.addEventListener('resize', fitCanvasToContainer);
@@ -506,65 +506,117 @@ function handleZoom(e) {
 let touchStartTime = 0;
 let touchStartPos = { x: 0, y: 0 };
 let isTouchMove = false;
+let touchStartDistance = 0;
 
 function handleTouchStart(e) {
     if (e.touches.length === 1) {
+        e.preventDefault(); // 기본 동작 방지 (스크롤, 줌 등)
         touchStartTime = Date.now();
         const touch = e.touches[0];
         touchStartPos = { x: touch.clientX, y: touch.clientY };
         isTouchMove = false;
         
-        // 드래그 시작
-        isDragging = true;
-        const rect = canvas.getBoundingClientRect();
-        dragStartX = touch.clientX - offsetX;
-        dragStartY = touch.clientY - offsetY;
+        // 드래그 시작하지 않음 (탭과 드래그를 구분하기 위해)
+        isDragging = false;
+    } else if (e.touches.length === 2) {
+        // 핀치 줌 시작
+        e.preventDefault();
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const distance = Math.sqrt(
+            Math.pow(touch2.clientX - touch1.clientX, 2) + 
+            Math.pow(touch2.clientY - touch1.clientY, 2)
+        );
+        touchStartDistance = distance;
     }
 }
 
 function handleTouchMove(e) {
     if (e.touches.length === 1) {
-        isTouchMove = true;
+        e.preventDefault(); // 기본 동작 방지
         const touch = e.touches[0];
         const moveDistance = Math.sqrt(
             Math.pow(touch.clientX - touchStartPos.x, 2) + 
             Math.pow(touch.clientY - touchStartPos.y, 2)
         );
         
-        // 10px 이상 이동하면 드래그로 간주
-        if (moveDistance > 10 && isDragging) {
-            e.preventDefault();
+        // 5px 이상 이동하면 드래그로 간주
+        if (moveDistance > 5) {
+            isTouchMove = true;
+            isDragging = true;
+            
+            // 드래그 시작점 설정 (처음 이동할 때만)
+            if (!dragStartX && !dragStartY) {
+                dragStartX = touch.clientX - offsetX;
+                dragStartY = touch.clientY - offsetY;
+            }
+            
+            // 지도 이동
             offsetX = touch.clientX - dragStartX;
             offsetY = touch.clientY - dragStartY;
             drawMap();
+        }
+    } else if (e.touches.length === 2) {
+        // 핀치 줌 처리
+        e.preventDefault();
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const distance = Math.sqrt(
+            Math.pow(touch2.clientX - touch1.clientX, 2) + 
+            Math.pow(touch2.clientY - touch1.clientY, 2)
+        );
+        
+        if (touchStartDistance > 0) {
+            const scaleChange = distance / touchStartDistance;
+            const newScale = scale * scaleChange;
+            
+            // 줌 제한
+            if (newScale >= 0.5 && newScale <= 3) {
+                scale = newScale;
+                drawMap();
+            }
         }
     }
 }
 
 function handleTouchEnd(e) {
+    e.preventDefault(); // 기본 동작 방지
     const touchDuration = Date.now() - touchStartTime;
+    
+    // 드래그 변수 초기화
+    dragStartX = 0;
+    dragStartY = 0;
     isDragging = false;
+    touchStartDistance = 0;
     
     // 짧은 터치이고 이동하지 않았으면 탭으로 간주 (상점 선택)
-    if (touchDuration < 300 && !isTouchMove) {
+    if (touchDuration < 500 && !isTouchMove) {
         if (e.changedTouches.length > 0) {
             const touch = e.changedTouches[0];
             const rect = canvas.getBoundingClientRect();
+            
+            // 터치 좌표를 캔버스 좌표로 변환
             const x = (touch.clientX - rect.left) * (canvas.width / rect.width) / scale - offsetX / scale;
             const y = (touch.clientY - rect.top) * (canvas.height / rect.height) / scale - offsetY / scale;
             
-            // 클릭된 상점 찾기
+            console.log('터치 좌표:', { x, y, clientX: touch.clientX, clientY: touch.clientY });
+            console.log('상점 목록:', stores);
+            
+            // 클릭된 상점 찾기 (반경을 더 크게 설정)
             const clickedStore = stores.find(store => {
                 const distance = Math.sqrt(
                     Math.pow(store.xCoordinate - x, 2) + 
                     Math.pow(store.yCoordinate - y, 2)
                 );
-                return distance <= 20; // 클릭 반경
+                console.log(`상점 ${store.storeName}: 거리 ${distance}, 좌표 (${store.xCoordinate}, ${store.yCoordinate})`);
+                return distance <= 30; // 클릭 반경을 30px로 증가
             });
             
             if (clickedStore) {
-                e.preventDefault(); // 기본 동작 방지
+                console.log('선택된 상점:', clickedStore);
                 showStoreDetail(clickedStore);
+            } else {
+                console.log('선택된 상점 없음');
             }
         }
     }
