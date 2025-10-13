@@ -119,6 +119,8 @@ body {
 #mapCanvas {
     display: block;
     cursor: grab;
+    touch-action: none; /* 모바일 터치 제스처 기본 동작 방지 */
+    -webkit-tap-highlight-color: transparent; /* iOS 터치 하이라이트 제거 */
 }
 
 #mapCanvas:active {
@@ -821,6 +823,28 @@ body {
     .store-popup {
         width: 95%;
         padding: 20px;
+        max-height: 85vh;
+        overflow-y: auto;
+    }
+    
+    .popup-title {
+        font-size: 20px;
+    }
+    
+    .popup-close {
+        font-size: 32px;
+        padding: 10px;
+    }
+    
+    /* 모바일에서 터치 영역 확대 */
+    .store-item {
+        padding: 18px;
+        min-height: 60px;
+    }
+    
+    .zone-tab {
+        padding: 12px 18px;
+        min-height: 44px;
     }
     
     .login-box {

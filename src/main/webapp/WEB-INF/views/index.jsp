@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>관문상가시장 안내도</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/static/css/style.css" rel="stylesheet">
+    <link href="/assets/css/style.css" rel="stylesheet">
 </head>
 <body>
     <!-- 헤더 -->
@@ -96,6 +96,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/static/js/map.js"></script>
+    <script src="/assets/js/map.js"></script>
 </body>
 </html>

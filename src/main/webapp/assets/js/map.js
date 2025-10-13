@@ -30,7 +30,7 @@ function initializeMap() {
     ctx = canvas.getContext('2d');
     
     // 지도 이미지 로드
-    mapImage.src = '/static/images/map.png';
+    mapImage.src = '/assets/images/map.png';
     mapImage.onload = function() {
         // 캔버스 크기 설정
         canvas.width = mapImage.width;
@@ -49,6 +49,11 @@ function initializeMap() {
     canvas.addEventListener('mousemove', drag);
     canvas.addEventListener('mouseup', endDrag);
     canvas.addEventListener('wheel', handleZoom);
+    
+    // 모바일 터치 이벤트 추가
+    canvas.addEventListener('touchstart', handleTouchStart);
+    canvas.addEventListener('touchmove', handleTouchMove);
+    canvas.addEventListener('touchend', handleTouchEnd);
     
     // 리사이즈 이벤트
     window.addEventListener('resize', fitCanvasToContainer);
@@ -493,6 +498,78 @@ function handleZoom(e) {
     
     scale = newScale;
     drawMap();
+}
+
+/**
+ * 모바일 터치 이벤트 처리
+ */
+let touchStartTime = 0;
+let touchStartPos = { x: 0, y: 0 };
+let isTouchMove = false;
+
+function handleTouchStart(e) {
+    if (e.touches.length === 1) {
+        touchStartTime = Date.now();
+        const touch = e.touches[0];
+        touchStartPos = { x: touch.clientX, y: touch.clientY };
+        isTouchMove = false;
+        
+        // 드래그 시작
+        isDragging = true;
+        const rect = canvas.getBoundingClientRect();
+        dragStartX = touch.clientX - offsetX;
+        dragStartY = touch.clientY - offsetY;
+    }
+}
+
+function handleTouchMove(e) {
+    if (e.touches.length === 1) {
+        isTouchMove = true;
+        const touch = e.touches[0];
+        const moveDistance = Math.sqrt(
+            Math.pow(touch.clientX - touchStartPos.x, 2) + 
+            Math.pow(touch.clientY - touchStartPos.y, 2)
+        );
+        
+        // 10px 이상 이동하면 드래그로 간주
+        if (moveDistance > 10 && isDragging) {
+            e.preventDefault();
+            offsetX = touch.clientX - dragStartX;
+            offsetY = touch.clientY - dragStartY;
+            drawMap();
+        }
+    }
+}
+
+function handleTouchEnd(e) {
+    const touchDuration = Date.now() - touchStartTime;
+    isDragging = false;
+    
+    // 짧은 터치이고 이동하지 않았으면 탭으로 간주 (상점 선택)
+    if (touchDuration < 300 && !isTouchMove) {
+        if (e.changedTouches.length > 0) {
+            const touch = e.changedTouches[0];
+            const rect = canvas.getBoundingClientRect();
+            const x = (touch.clientX - rect.left) * (canvas.width / rect.width) / scale - offsetX / scale;
+            const y = (touch.clientY - rect.top) * (canvas.height / rect.height) / scale - offsetY / scale;
+            
+            // 클릭된 상점 찾기
+            const clickedStore = stores.find(store => {
+                const distance = Math.sqrt(
+                    Math.pow(store.xCoordinate - x, 2) + 
+                    Math.pow(store.yCoordinate - y, 2)
+                );
+                return distance <= 20; // 클릭 반경
+            });
+            
+            if (clickedStore) {
+                e.preventDefault(); // 기본 동작 방지
+                showStoreDetail(clickedStore);
+            }
+        }
+    }
+    
+    isTouchMove = false;
 }
 
 /**
