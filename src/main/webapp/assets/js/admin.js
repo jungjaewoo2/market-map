@@ -31,13 +31,53 @@ function initializeAdminMap() {
     
     ctx = canvas.getContext('2d');
     
-    // 지도 이미지 로드
-    mapImage.src = '/static/images/map.png';
+    // 지도 이미지 로드 - 여러 경로 시도
+    const imagePaths = [
+        '/assets/images/map.png',
+        './assets/images/map.png',
+        'assets/images/map.png'
+    ];
+    
+    let currentPathIndex = 0;
+    
+    function tryLoadImage() {
+        if (currentPathIndex < imagePaths.length) {
+            mapImage.src = imagePaths[currentPathIndex];
+            console.log('관리자 페이지 이미지 로딩 시도:', imagePaths[currentPathIndex]);
+        }
+    }
+    
+    tryLoadImage();
     mapImage.onload = function() {
+        console.log('관리자 페이지 지도 이미지 로드 성공:', mapImage.src);
+        console.log('이미지 크기:', mapImage.width, 'x', mapImage.height);
+        
         canvas.width = mapImage.width;
         canvas.height = mapImage.height;
         fitCanvasToContainer();
         drawAdminMap();
+    };
+    
+    mapImage.onerror = function() {
+        console.error('관리자 페이지 지도 이미지 로드 실패:', mapImage.src);
+        
+        // 다음 경로 시도
+        currentPathIndex++;
+        if (currentPathIndex < imagePaths.length) {
+            console.log('관리자 페이지 다음 경로로 재시도:', imagePaths[currentPathIndex]);
+            tryLoadImage();
+        } else {
+            console.error('관리자 페이지 모든 경로에서 이미지 로드 실패');
+            // 기본 배경색 설정
+            if (ctx) {
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#666';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('지도 이미지를 불러올 수 없습니다', canvas.width/2, canvas.height/2);
+            }
+        }
     };
     
     // 이벤트 리스너
@@ -334,13 +374,20 @@ function resetForm() {
 async function loadStores() {
     try {
         console.log('상점 목록 로드 시작');
-        const response = await fetch('/api/stores/list');
+        const response = await fetch('/api/admin/stores');
         console.log('API 응답 상태:', response.status);
         
         if (response.ok) {
-            const data = await response.json();
-            console.log('API 응답 데이터:', data);
-            stores = Array.isArray(data) ? data : [];
+            const result = await response.json();
+            console.log('API 응답 데이터:', result);
+            
+            if (result.success) {
+                const data = result.stores;
+                stores = Array.isArray(data) ? data : [];
+            } else {
+                console.log('API 응답 실패:', result.message);
+                stores = getDummyStores();
+            }
         } else {
             console.log('API 응답 실패, 테스트 데이터 사용');
             stores = getDummyStores();
@@ -495,20 +542,23 @@ async function loadExistingImages(storeId) {
                     let imageUrl = image.imageUrl;
                     console.log(`이미지 ${index + 1} 원본 URL:`, imageUrl);
                     if (imageUrl) {
-                        // /uploads/stores/로 시작하는 경우 /static/ 경로로 변환
+                        // /uploads/stores/로 시작하는 경우 그대로 사용 (WebConfig에서 매핑됨)
                         if (imageUrl.startsWith('/uploads/stores/')) {
-                            imageUrl = '/static' + imageUrl;
-                            console.log(`이미지 ${index + 1} 변환된 URL:`, imageUrl);
+                            // 이미 올바른 경로이므로 그대로 사용
+                            console.log(`이미지 ${index + 1} URL 유지:`, imageUrl);
                         } else if (!imageUrl.startsWith('http') && !imageUrl.startsWith('/')) {
-                            imageUrl = '/static/uploads/stores/' + imageUrl;
+                            // 파일명만 있는 경우 /uploads/stores/ 경로 추가
+                            imageUrl = '/uploads/stores/' + imageUrl;
                             console.log(`이미지 ${index + 1} 변환된 URL:`, imageUrl);
                         }
                     }
 
                     imageDiv.innerHTML = `
                         <img src="${imageUrl}" alt="기존 이미지" style="width: 100px; height: 100px; object-fit: cover;"
-                             onload="console.log('이미지 로드 성공:', '${imageUrl}')"
-                             onerror="console.error('이미지 로드 실패:', '${imageUrl}'); this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjRjVGNUY1IiBzdHJva2U9IiNDQ0MiIHN0cm9rZS13aWR0aD0iMiIvPgo8Y2lyY2xlIGN4PSI1MCIgY3k9IjM1IiByPSIxNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOTk5IiBzdHJva2Utd2lkdGg9IjMiLz4KPHBhdGggZD0iTTMwIDY1TDUwIDQ1TDcwIDY1IiBzdHJva2U9IiM5OTkiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0ibm9uZSIvPgo8dGV4dCB4PSI1MCIgeT0iODAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+SW1hZ2U8L3RleHQ+Cjx0ZXh0IHg9IjUwIiB5PSI5NSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5Ob3QgRm91bmQ8L3RleHQ+Cjwvc3ZnPgo='; this.alt='이미지 로드 실패'; console.log('대체 이미지로 변경됨');">
+                             onload="console.log('✅ 이미지 로드 성공:', '${imageUrl}')"
+                             onerror="console.error('❌ 이미지 로드 실패:', '${imageUrl}'); console.log('HTTP 상태 확인을 위해 fetch로 테스트...'); 
+                                      fetch('${imageUrl}').then(r => console.log('Fetch 결과:', r.status, r.statusText)).catch(e => console.error('Fetch 오류:', e));
+                                      this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjRjVGNUY1IiBzdHJva2U9IiNDQ0MiIHN0cm9rZS13aWR0aD0iMiIvPgo8Y2lyY2xlIGN4PSI1MCIgY3k9IjM1IiByPSIxNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOTk5IiBzdHJva2Utd2lkdGg9IjMiLz4KPHBhdGggZD0iTTMwIDY1TDUwIDQ1TDcwIDY1IiBzdHJva2U9IiM5OTkiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0ibm9uZSIvPgo8dGV4dCB4PSI1MCIgeT0iODAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+SW1hZ2U8L3RleHQ+Cjx0ZXh0IHg9IjUwIiB5PSI5NSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5Ob3QgRm91bmQ8L3RleHQ+Cjwvc3ZnPgo='; this.alt='이미지 로드 실패'; console.log('대체 이미지로 변경됨');">
                         <button class="existing-image-delete-btn" onclick="deleteExistingImage(${image.imageId})"
                                 style="position: absolute; top: 5px; right: 5px; background: #f44336; color: white; border: none;
                                        border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 16px;

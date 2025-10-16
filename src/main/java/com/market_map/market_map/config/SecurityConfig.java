@@ -48,7 +48,7 @@ public class SecurityConfig {
                 
                 return org.springframework.security.core.userdetails.User.builder()
                     .username(admin.getUsername())
-                    .password(admin.getPassword()) // NoOpPasswordEncoder가 평문 비밀번호를 처리합니다.
+                    .password(admin.getPassword()) // 평문 비밀번호
                     .roles("ADMIN")
                     .build();
             }

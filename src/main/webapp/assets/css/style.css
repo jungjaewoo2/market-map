@@ -121,6 +121,9 @@ body {
     cursor: grab;
     touch-action: none; /* 모바일 터치 제스처 기본 동작 방지 */
     -webkit-tap-highlight-color: transparent; /* iOS 터치 하이라이트 제거 */
+    image-rendering: -webkit-optimize-contrast; /* WebKit 최적화 */
+    image-rendering: crisp-edges; /* 선명한 가장자리 */
+    image-rendering: pixelated; /* 픽셀 단위 렌더링 */
 }
 
 #mapCanvas:active {
@@ -433,6 +436,9 @@ body {
     width: 100%;
     height: auto;
     max-width: 100%;
+    image-rendering: -webkit-optimize-contrast; /* WebKit 최적화 */
+    image-rendering: crisp-edges; /* 선명한 가장자리 */
+    image-rendering: pixelated; /* 픽셀 단위 렌더링 */
 }
 
 .coordinate-info {

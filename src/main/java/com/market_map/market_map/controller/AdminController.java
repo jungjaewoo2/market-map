@@ -128,6 +128,44 @@ public class AdminController {
     }
     
     /**
+     * 관리자용 상점 목록 조회
+     * @param request HTTP 요청
+     * @return 상점 목록 JSON
+     */
+    @GetMapping("/stores")
+    public ResponseEntity<String> getAllStoresForAdmin(HttpServletRequest request) {
+        try {
+            // Spring Security의 인증 정보 확인
+            org.springframework.security.core.Authentication auth = 
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            
+            if (auth == null || !auth.isAuthenticated() || auth.getPrincipal().equals("anonymousUser")) {
+                logger.warn("인증되지 않은 사용자의 상점 목록 조회 시도");
+                Map<String, String> error = new HashMap<>();
+                error.put("success", "false");
+                error.put("message", "로그인이 필요합니다.");
+                return ResponseEntity.status(401).body(gson.toJson(error));
+            }
+            
+            logger.info("상점 목록 조회 요청 - 사용자: {}", auth.getName());
+            List<Store> stores = storeService.getAllStores();
+            logger.info("조회된 상점 수: {}", stores.size());
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("stores", stores);
+            
+            return ResponseEntity.ok(gson.toJson(result));
+        } catch (Exception e) {
+            logger.error("상점 목록 조회 중 오류 발생", e);
+            Map<String, String> error = new HashMap<>();
+            error.put("success", "false");
+            error.put("message", "상점 목록을 불러오는 중 오류가 발생했습니다: " + e.getMessage());
+            return ResponseEntity.status(500).body(gson.toJson(error));
+        }
+    }
+    
+    /**
      * 상점 생성
      * @param store 상점 정보
      * @param images 업로드된 이미지 파일들
@@ -369,23 +407,33 @@ public class AdminController {
     @DeleteMapping("/stores/{storeId}")
     public ResponseEntity<String> deleteStore(@PathVariable Long storeId, HttpServletRequest request) {
         try {
-            // 세션 확인
-            HttpSession session = request.getSession(false);
-            if (session == null || session.getAttribute("adminId") == null) {
+            logger.info("=== 상점 삭제 요청 시작 ===");
+            logger.info("삭제할 상점 ID: {}", storeId);
+            
+            // Spring Security의 인증 정보 확인
+            org.springframework.security.core.Authentication auth = 
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            
+            if (auth == null || !auth.isAuthenticated() || auth.getPrincipal().equals("anonymousUser")) {
+                logger.warn("인증되지 않은 사용자의 상점 삭제 시도");
                 Map<String, String> error = new HashMap<>();
                 error.put("success", "false");
                 error.put("message", "로그인이 필요합니다.");
                 return ResponseEntity.status(401).body(gson.toJson(error));
             }
             
+            logger.info("상점 삭제 요청 - 사용자: {}", auth.getName());
             boolean deleted = storeService.deleteStore(storeId);
+            logger.info("상점 삭제 결과: {}", deleted);
             
             Map<String, Object> result = new HashMap<>();
             result.put("success", deleted);
             result.put("message", deleted ? "상점이 삭제되었습니다." : "상점 삭제에 실패했습니다.");
             
+            logger.info("=== 상점 삭제 완료 ===");
             return ResponseEntity.ok(gson.toJson(result));
         } catch (Exception e) {
+            logger.error("=== 상점 삭제 오류 ===", e);
             Map<String, String> error = new HashMap<>();
             error.put("success", "false");
             error.put("message", "상점 삭제 중 오류가 발생했습니다: " + e.getMessage());
@@ -536,8 +584,8 @@ public class AdminController {
             Path filePath = Paths.get(uploadPath.getAbsolutePath(), fileName);
             Files.copy(image.getInputStream(), filePath);
             
-            // 웹 경로 반환 (/static/uploads/stores/)
-            return "/static/uploads/stores/" + fileName;
+            // 웹 경로 반환 (/uploads/stores/)
+            return "/uploads/stores/" + fileName;
         } catch (IOException e) {
             logger.error("이미지 업로드 오류: {}", e.getMessage(), e);
             return null;

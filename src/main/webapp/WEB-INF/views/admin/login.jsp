@@ -6,7 +6,78 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>관리자 로그인 - 관문상가시장</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/static/css/style.css" rel="stylesheet">
+    <link href="/assets/css/style.css" rel="stylesheet">
+    <style>
+        /* 로그인 페이지 스타일 - 인라인으로 추가 */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .login-box {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-title {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .login-input {
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .login-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .login-btn {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+    </style>
 </head>
 <body>
     <div class="login-container">
@@ -65,14 +136,26 @@
             }
             
             // 폼 제출 시 로딩 상태 표시
-            document.getElementById('loginForm').addEventListener('submit', function() {
+            document.getElementById('loginForm').addEventListener('submit', function(e) {
                 const loginBtn = document.getElementById('loginBtn');
                 const loginBtnText = document.getElementById('loginBtnText');
                 const loginSpinner = document.getElementById('loginSpinner');
                 
+                // 입력값 검증
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value.trim();
+                
+                if (!username || !password) {
+                    e.preventDefault();
+                    showAlert('사용자명과 비밀번호를 입력해주세요.', 'error');
+                    return;
+                }
+                
                 loginBtn.disabled = true;
                 loginBtnText.style.display = 'none';
                 loginSpinner.style.display = 'inline';
+                
+                // 폼 제출을 계속 진행
             });
         });
         

@@ -16,13 +16,13 @@ public class WebConfig implements WebMvcConfigurer {
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         // assets 폴더 정적 리소스 핸들러 (WAR 배포용)
         registry.addResourceHandler("/assets/**")
-                .addResourceLocations("/assets/")
+                .addResourceLocations("file:src/main/webapp/assets/")
                 .setCachePeriod(3600);
         
         // uploads 폴더 정적 리소스 핸들러
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations("file:src/main/webapp/uploads/")
-                .setCachePeriod(3600);
+                .setCachePeriod(0); // 캐시 비활성화
         
         // static 폴더 정적 리소스 핸들러 (기본)
         registry.addResourceHandler("/static/**")

@@ -4,6 +4,7 @@ import com.market_map.market_map.entity.Admin;
 import com.market_map.market_map.repository.AdminRepository;
 import com.market_map.market_map.util.PasswordUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
@@ -24,6 +25,9 @@ public class AdminService {
     @Autowired
     private AdminRepository adminRepository;
     
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    
     /**
      * 관리자 로그인 인증
      * @param username 사용자명
@@ -36,7 +40,7 @@ public class AdminService {
         if (adminOpt.isPresent()) {
             Admin admin = adminOpt.get();
 
-            // 평문 비밀번호 비교
+            // 평문 비밀번호 비교 (개발용)
             if (password.equals(admin.getPassword())) {
                 return admin;
             }
@@ -115,16 +119,16 @@ public class AdminService {
         logger.info("관리자 조회 성공: username={}", admin.getUsername());
         logger.info("현재 저장된 비밀번호 길이: {}", admin.getPassword() != null ? admin.getPassword().length() : 0);
 
-        // 기존 비밀번호 검증 (평문 비교)
-        if (!oldPassword.equals(admin.getPassword())) {
+        // 기존 비밀번호 검증 (BCrypt 비교)
+        if (!passwordEncoder.matches(oldPassword, admin.getPassword())) {
             logger.warn("기존 비밀번호 불일치");
             throw new IllegalArgumentException("기존 비밀번호가 올바르지 않습니다.");
         }
         
         logger.info("기존 비밀번호 검증 성공");
 
-        // 비밀번호 변경 (평문 저장)
-        admin.setPassword(newPassword);
+        // 비밀번호 변경 (BCrypt 해시 저장)
+        admin.setPassword(passwordEncoder.encode(newPassword));
         Admin savedAdmin = adminRepository.save(admin);
         
         logger.info("비밀번호 변경 완료: adminId={}", savedAdmin.getAdminId());

@@ -12,12 +12,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "admin_users")
+@Table(name = "admin")
 public class Admin {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "admin_id")
+    @Column(name = "id")
     private Long adminId;
     
     @NotBlank(message = "사용자명은 필수입니다")
@@ -33,7 +33,6 @@ public class Admin {
     @Column(name = "email", length = 100)
     private String email;
     
-    @NotBlank(message = "이름은 필수입니다")
     @Size(max = 50, message = "이름은 50자를 초과할 수 없습니다")
     @Column(name = "name", length = 50)
     private String name;

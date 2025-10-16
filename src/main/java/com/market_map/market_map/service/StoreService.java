@@ -195,11 +195,18 @@ public class StoreService {
      * @return 삭제 성공 여부
      */
     public boolean deleteStore(Long storeId) {
+        logger.info("상점 삭제 처리 시작 - storeId: {}", storeId);
+        
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상점입니다."));
         
+        logger.info("삭제 전 상점 정보 - storeName: {}, isActive: {}", store.getStoreName(), store.getIsActive());
+        
         store.setIsActive(false);
-        storeRepository.save(store);
+        Store savedStore = storeRepository.save(store);
+        
+        logger.info("삭제 후 상점 정보 - storeName: {}, isActive: {}", savedStore.getStoreName(), savedStore.getIsActive());
+        logger.info("상점 삭제 처리 완료 - storeId: {}", storeId);
         
         return true;
     }
