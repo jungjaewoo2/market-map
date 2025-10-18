@@ -6,12 +6,15 @@
 let canvas, ctx;
 let mapImage = new Image();
 let stores = [];
+let allStores = []; // 모든 상점 데이터 (원본 보관용)
 let selectedZone = 0;
 let baseScale = 1; // 초기 캔버스 크기에 맞춘 기본 스케일
 let userScale = 1; // 사용자가 줌으로 조정한 스케일
 let offsetX = 0, offsetY = 0;
 let isDragging = false;
 let dragStartX, dragStartY;
+let highlightedStores = []; // 하이라이트된 상점 ID 배열 (클릭/검색)
+let hoveredStoreId = null; // 마우스 호버 중인 상점 ID
 
 /**
  * 페이지 로드 시 초기화
@@ -87,8 +90,9 @@ function initializeMap() {
     // 이벤트 리스너
     canvas.addEventListener('click', handleMapClick);
     canvas.addEventListener('mousedown', startDrag);
-    canvas.addEventListener('mousemove', drag);
+    canvas.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('mouseup', endDrag);
+    canvas.addEventListener('mouseleave', handleMouseLeave);
     canvas.addEventListener('wheel', handleZoom);
     
     // 모바일 터치 이벤트 - 확대/축소와 클릭 모두 지원
@@ -195,7 +199,9 @@ function drawStoreMarkers() {
     
     stores.forEach(store => {
         if (selectedZone === 0 || store.zoneNumber === selectedZone) {
-            drawMarker(store.xCoordinate, store.yCoordinate, store.categoryId, store.storeName);
+            // 하이라이트 조건: 클릭/검색된 상점 또는 호버 중인 상점
+            const isHighlighted = highlightedStores.includes(store.storeId) || hoveredStoreId === store.storeId;
+            drawMarker(store.xCoordinate, store.yCoordinate, store.categoryId, store.storeName, isHighlighted);
         }
     });
 }
@@ -203,7 +209,7 @@ function drawStoreMarkers() {
 /**
  * 마커 그리기
  */
-function drawMarker(x, y, categoryId, name) {
+function drawMarker(x, y, categoryId, name, isHighlighted = false) {
     if (!ctx) return;
     
     ctx.save();
@@ -219,12 +225,26 @@ function drawMarker(x, y, categoryId, name) {
     
     const markerColor = colors[categoryId] || '#ff4757'; // 기본값도 빨간색으로
     
+    // 하이라이트되지 않은 경우 투명하게 표시
+    if (!isHighlighted) {
+        // 투명한 마커 (클릭 영역만 유지하기 위해 매우 투명하게)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+        ctx.beginPath();
+        ctx.arc(x, y, 20, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.restore();
+        return;
+    }
+    
+    // 하이라이트된 경우: 빨간색으로 강조 표시
+    const highlightColor = '#ff4757'; // 빨간색으로 고정
+    
     // 펄스 효과 (애니메이션)
     const time = Date.now() * 0.003;
     const pulseScale = 1 + Math.sin(time) * 0.1;
     
     // 펄스 효과 배경 (반투명)
-    ctx.fillStyle = markerColor + '40'; // 40은 투명도
+    ctx.fillStyle = highlightColor + '40'; // 40은 투명도
     ctx.beginPath();
     ctx.arc(x, y, 25 * pulseScale, 0, 2 * Math.PI);
     ctx.fill();
@@ -236,8 +256,8 @@ function drawMarker(x, y, categoryId, name) {
     ctx.arc(x, y, 20, 0, 2 * Math.PI);
     ctx.stroke();
     
-    // 메인 마커 (밝은 색상)
-    ctx.fillStyle = markerColor;
+    // 메인 마커 (빨간색)
+    ctx.fillStyle = highlightColor;
     ctx.beginPath();
     ctx.arc(x, y, 20, 0, 2 * Math.PI);
     ctx.fill();
@@ -265,16 +285,19 @@ async function loadStores() {
     try {
         const response = await fetch('/api/stores/list');
         if (response.ok) {
-            stores = await response.json();
+            allStores = await response.json();
+            stores = [...allStores]; // 복사본 생성
         } else {
             console.error('상점 데이터 로드 실패');
             // 테스트용 더미 데이터
-            stores = getDummyStores();
+            allStores = getDummyStores();
+            stores = [...allStores]; // 복사본 생성
         }
     } catch (error) {
         console.error('Error:', error);
         // 테스트용 더미 데이터
-        stores = getDummyStores();
+        allStores = getDummyStores();
+        stores = [...allStores]; // 복사본 생성
     }
     
     updateStoreList();
@@ -377,6 +400,9 @@ function showStoreDetail(store) {
     const popup = document.getElementById('storePopup');
     if (!popup) return;
     
+    // 클릭한 상점만 하이라이트 (이전 클릭한 상점들의 마킹 제거)
+    highlightedStores = [store.storeId];
+    
     document.getElementById('popupTitle').textContent = store.storeName;
     document.getElementById('popupPhone').textContent = store.phoneNumber || '정보 없음';
     document.getElementById('popupZone').textContent = `${store.zoneNumber || '?'}지구 (${store.storeCode || '코드 없음'})`;
@@ -392,6 +418,9 @@ function showStoreDetail(store) {
     
     // 지도에서 해당 상점으로 포커스
     focusOnStore(store);
+    
+    // 지도 다시 그리기 (마커 색상 업데이트)
+    drawMap();
 }
 
 /**
@@ -565,10 +594,14 @@ async function searchStore() {
     const searchInput = document.getElementById('searchInput');
     if (!searchInput) return;
     
-    const keyword = searchInput.value.toLowerCase();
+    const keyword = searchInput.value.toLowerCase().trim();
     
     if (!keyword) {
-        loadStores();
+        // 검색어가 없으면 모든 상점 표시
+        stores = [...allStores];
+        highlightedStores = [];
+        updateStoreList();
+        drawMap();
         return;
     }
     
@@ -577,24 +610,28 @@ async function searchStore() {
         if (response.ok) {
             stores = await response.json();
         } else {
-            // 로컬 검색
-            stores = stores.filter(store => 
+            // 로컬 검색 (원본 데이터에서 검색)
+            stores = allStores.filter(store => 
                 store.storeName.toLowerCase().includes(keyword) ||
-                store.storeCode.toLowerCase().includes(keyword)
+                (store.storeCode && store.storeCode.toLowerCase().includes(keyword))
             );
         }
     } catch (error) {
         console.error('Search error:', error);
-        // 로컬 검색
-        stores = stores.filter(store => 
+        // 로컬 검색 (원본 데이터에서 검색)
+        stores = allStores.filter(store => 
             store.storeName.toLowerCase().includes(keyword) ||
-            store.storeCode.toLowerCase().includes(keyword)
+            (store.storeCode && store.storeCode.toLowerCase().includes(keyword))
         );
     }
+    
+    // 검색된 상점들만 하이라이트
+    highlightedStores = stores.map(store => store.storeId);
     
     updateStoreList();
     drawMap();
     
+    // 검색 결과가 1개면 자동으로 상세 정보 표시
     if (stores.length === 1) {
         showStoreDetail(stores[0]);
     }
@@ -609,14 +646,26 @@ function resetSearch() {
         searchInput.value = '';
     }
     
-    // 모든 상점 다시 로드
-    loadStores();
+    // 하이라이트 초기화
+    highlightedStores = [];
+    
+    // 모든 상점 복원
+    stores = [...allStores];
     
     // 구역 필터도 초기화
     selectedZone = 0;
     document.querySelectorAll('.zone-tab').forEach(tab => {
         tab.classList.remove('active');
     });
+    
+    // 첫 번째 탭 활성화 (전체)
+    const firstTab = document.querySelector('.zone-tab');
+    if (firstTab) {
+        firstTab.classList.add('active');
+    }
+    
+    // 상점 목록 업데이트
+    updateStoreList();
     
     // 지도 뷰 초기화
     userScale = 1;
@@ -635,18 +684,66 @@ function startDrag(e) {
     canvas.style.cursor = 'grabbing';
 }
 
-function drag(e) {
-    if (!isDragging) return;
-    
-    e.preventDefault();
-    offsetX = e.clientX - dragStartX;
-    offsetY = e.clientY - dragStartY;
-    drawMap();
-}
-
 function endDrag() {
     isDragging = false;
     canvas.style.cursor = 'grab';
+}
+
+/**
+ * 마우스 이동 처리 (드래그 + 호버)
+ */
+function handleMouseMove(e) {
+    // 드래그 처리
+    if (isDragging) {
+        e.preventDefault();
+        offsetX = e.clientX - dragStartX;
+        offsetY = e.clientY - dragStartY;
+        drawMap();
+        return;
+    }
+    
+    // 호버 처리
+    const rect = canvas.getBoundingClientRect();
+    const totalScale = baseScale * userScale;
+    
+    // 화면 좌표를 표시된 캔버스 좌표로 변환
+    const displayX = e.clientX - rect.left;
+    const displayY = e.clientY - rect.top;
+    
+    // 오프셋과 스케일을 역으로 적용하여 원본 이미지 좌표로 변환
+    const imageX = (displayX - offsetX) / totalScale;
+    const imageY = (displayY - offsetY) / totalScale;
+    
+    // 마우스 위치에 있는 상점 찾기
+    const hoveredStore = stores.find(store => {
+        if (selectedZone !== 0 && store.zoneNumber !== selectedZone) {
+            return false;
+        }
+        const distance = Math.sqrt(
+            Math.pow(store.xCoordinate - imageX, 2) +
+            Math.pow(store.yCoordinate - imageY, 2)
+        );
+        return distance <= 60; // 호버 반경
+    });
+    
+    // 호버 상태 변경 확인
+    const newHoveredId = hoveredStore ? hoveredStore.storeId : null;
+    if (newHoveredId !== hoveredStoreId) {
+        hoveredStoreId = newHoveredId;
+        // 커서 스타일 변경
+        canvas.style.cursor = hoveredStoreId ? 'pointer' : 'grab';
+        // 지도 다시 그리기는 애니메이션 루프에서 처리되므로 별도 호출 불필요
+    }
+}
+
+/**
+ * 마우스가 캔버스를 벗어났을 때
+ */
+function handleMouseLeave() {
+    if (hoveredStoreId !== null) {
+        hoveredStoreId = null;
+        canvas.style.cursor = 'grab';
+    }
 }
 
 /**
