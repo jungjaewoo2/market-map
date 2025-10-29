@@ -12,6 +12,10 @@ let isDragging = false;
 let dragStartX, dragStartY;
 let selectedX = null, selectedY = null;
 let stores = [];
+let currentPage = 0;
+let pageSize = 10;
+let totalPages = 0;
+let totalElements = 0;
 
 /**
  * 페이지 로드 시 초기화
@@ -346,7 +350,7 @@ async function saveStore(e) {
         
         if (result.success) {
             showAlert(isEdit ? '상점이 수정되었습니다.' : '상점이 등록되었습니다.', 'success');
-            loadStores();
+            loadStores(currentPage);
             resetForm();
         } else {
             showAlert(result.message || (isEdit ? '상점 수정에 실패했습니다.' : '상점 등록에 실패했습니다.'), 'error');
@@ -373,12 +377,12 @@ function resetForm() {
 }
 
 /**
- * 상점 목록 로드
+ * 상점 목록 로드 (페이징)
  */
-async function loadStores() {
+async function loadStores(page = currentPage) {
     try {
-        console.log('상점 목록 로드 시작');
-        const response = await fetch('/api/admin/stores');
+        console.log('상점 목록 로드 시작 - 페이지:', page);
+        const response = await fetch(`/api/admin/stores?page=${page}&size=${pageSize}`);
         console.log('API 응답 상태:', response.status);
         
         if (response.ok) {
@@ -388,21 +392,51 @@ async function loadStores() {
             if (result.success) {
                 const data = result.stores;
                 stores = Array.isArray(data) ? data : [];
+                
+                // 페이징 정보 업데이트 (명시적으로 숫자로 변환)
+                currentPage = parseInt(result.currentPage) || 0;
+                totalPages = parseInt(result.totalPages) || 0;
+                totalElements = parseInt(result.totalElements) || 0;
+                pageSize = parseInt(result.pageSize) || 10;
+                
+                console.log('페이징 정보 업데이트:', {
+                    currentPage,
+                    totalPages,
+                    totalElements,
+                    pageSize,
+                    result: result
+                });
             } else {
                 console.log('API 응답 실패:', result.message);
-                stores = getDummyStores();
+                stores = [];
+                // 실패 시에도 페이징 정보 초기화
+                totalPages = 0;
+                totalElements = 0;
             }
         } else {
-            console.log('API 응답 실패, 테스트 데이터 사용');
-            stores = getDummyStores();
+            console.log('API 응답 실패, 빈 목록 사용');
+            stores = [];
+            // 실패 시에도 페이징 정보 초기화
+            totalPages = 0;
+            totalElements = 0;
         }
     } catch (error) {
         console.error('상점 목록 로드 오류:', error);
-        stores = getDummyStores();
+        stores = [];
+        // 오류 시에도 페이징 정보 초기화
+        totalPages = 0;
+        totalElements = 0;
     }
     
     console.log('최종 stores 배열:', stores);
+    console.log('페이징 UI 업데이트 호출 전 상태:', {
+        currentPage,
+        totalPages,
+        totalElements,
+        storesLength: stores.length
+    });
     updateStoreTable();
+    updatePaginationUI();
     drawAdminMap();
 }
 
@@ -431,6 +465,15 @@ function updateStoreTable() {
     console.log('상점 테이블 업데이트 시작, stores 개수:', stores.length);
     tbody.innerHTML = '';
     
+    if (stores.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td colspan="7" class="text-center text-muted">등록된 상점이 없습니다.</td>
+        `;
+        tbody.appendChild(row);
+        return;
+    }
+    
     stores.forEach((store, index) => {
         console.log(`상점 ${index + 1}:`, store);
         const row = document.createElement('tr');
@@ -450,6 +493,139 @@ function updateStoreTable() {
     });
     
     console.log('상점 테이블 업데이트 완료');
+}
+
+/**
+ * 페이징 UI 업데이트
+ */
+function updatePaginationUI() {
+    const paginationContainer = document.getElementById('paginationContainer');
+    if (!paginationContainer) {
+        console.error('paginationContainer 요소를 찾을 수 없습니다.');
+        return;
+    }
+    
+    console.log('페이징 UI 업데이트 시작:', {
+        currentPage,
+        totalPages,
+        totalElements,
+        storesLength: stores.length
+    });
+    
+    paginationContainer.innerHTML = '';
+    
+    // 전체 상점 수 표시 (항상 표시)
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'pagination-info mb-2 text-center';
+    const displayTotalPages = totalPages > 0 ? totalPages : 1;
+    infoDiv.innerHTML = `
+        <small class="text-muted">
+            전체 <strong>${totalElements}</strong>개 중 
+            <strong>${stores.length}</strong>개 표시 
+            (페이지 ${currentPage + 1} / ${displayTotalPages})
+        </small>
+    `;
+    paginationContainer.appendChild(infoDiv);
+    
+    // 페이지 번호가 1개 이하면 페이징 버튼 표시 안 함
+    if (totalPages <= 1) {
+        console.log('페이징 버튼 표시 안 함 (totalPages <= 1)');
+        return;
+    }
+    
+    console.log('페이징 버튼 생성 시작');
+    
+    // 페이징 버튼 컨테이너
+    const nav = document.createElement('nav');
+    nav.setAttribute('aria-label', '페이지 네비게이션');
+    
+    const ul = document.createElement('ul');
+    ul.className = 'pagination justify-content-center mb-0';
+    
+    // 이전 버튼
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${currentPage === 0 ? 'disabled' : ''}`;
+    prevLi.innerHTML = `
+        <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">이전</a>
+    `;
+    ul.appendChild(prevLi);
+    
+    // 페이지 번호 버튼들
+    const maxButtons = 5; // 최대 표시할 페이지 번호 개수
+    let startPage = Math.max(0, currentPage - Math.floor(maxButtons / 2));
+    let endPage = Math.min(totalPages - 1, startPage + maxButtons - 1);
+    
+    // 시작 페이지 조정
+    if (endPage - startPage < maxButtons - 1) {
+        startPage = Math.max(0, endPage - maxButtons + 1);
+    }
+    
+    // 첫 페이지 버튼
+    if (startPage > 0) {
+        const firstLi = document.createElement('li');
+        firstLi.className = 'page-item';
+        firstLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(0); return false;">1</a>`;
+        ul.appendChild(firstLi);
+        
+        if (startPage > 1) {
+            const ellipsisLi = document.createElement('li');
+            ellipsisLi.className = 'page-item disabled';
+            ellipsisLi.innerHTML = `<span class="page-link">...</span>`;
+            ul.appendChild(ellipsisLi);
+        }
+    }
+    
+    // 페이지 번호 버튼
+    for (let i = startPage; i <= endPage; i++) {
+        const pageLi = document.createElement('li');
+        pageLi.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        pageLi.innerHTML = `
+            <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i + 1}</a>
+        `;
+        ul.appendChild(pageLi);
+    }
+    
+    // 마지막 페이지 버튼
+    if (endPage < totalPages - 1) {
+        if (endPage < totalPages - 2) {
+            const ellipsisLi = document.createElement('li');
+            ellipsisLi.className = 'page-item disabled';
+            ellipsisLi.innerHTML = `<span class="page-link">...</span>`;
+            ul.appendChild(ellipsisLi);
+        }
+        
+        const lastLi = document.createElement('li');
+        lastLi.className = 'page-item';
+        lastLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${totalPages - 1}); return false;">${totalPages}</a>`;
+        ul.appendChild(lastLi);
+    }
+    
+    // 다음 버튼
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${currentPage >= totalPages - 1 ? 'disabled' : ''}`;
+    nextLi.innerHTML = `
+        <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">다음</a>
+    `;
+    ul.appendChild(nextLi);
+    
+    nav.appendChild(ul);
+    paginationContainer.appendChild(nav);
+}
+
+/**
+ * 페이지 이동
+ */
+function goToPage(page) {
+    if (page < 0 || page >= totalPages) {
+        return;
+    }
+    loadStores(page);
+    
+    // 페이지 이동 시 상점 목록 섹션으로 스크롤
+    const storeListSection = document.querySelector('.store-list-section');
+    if (storeListSection) {
+        storeListSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 }
 
 
@@ -648,8 +824,12 @@ async function deleteStore(storeId) {
         const result = await response.json();
         
         if (result.success) {
-            stores = stores.filter(s => s.storeId !== storeId);
-            updateStoreTable();
+            // 현재 페이지의 상점이 하나뿐이면 이전 페이지로 이동
+            if (stores.length === 1 && currentPage > 0) {
+                loadStores(currentPage - 1);
+            } else {
+                loadStores(currentPage);
+            }
             drawAdminMap();
             showAlert('상점이 삭제되었습니다.', 'success');
         } else {

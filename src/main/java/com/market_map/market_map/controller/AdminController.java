@@ -7,6 +7,9 @@ import com.market_map.market_map.service.StoreService;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -128,12 +131,17 @@ public class AdminController {
     }
     
     /**
-     * 관리자용 상점 목록 조회
+     * 관리자용 상점 목록 조회 (페이징 지원)
+     * @param page 페이지 번호 (0부터 시작, 기본값: 0)
+     * @param size 페이지 크기 (기본값: 10)
      * @param request HTTP 요청
-     * @return 상점 목록 JSON
+     * @return 상점 목록 JSON (페이징 정보 포함)
      */
     @GetMapping("/stores")
-    public ResponseEntity<String> getAllStoresForAdmin(HttpServletRequest request) {
+    public ResponseEntity<String> getAllStoresForAdmin(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
+            HttpServletRequest request) {
         try {
             // Spring Security의 인증 정보 확인
             org.springframework.security.core.Authentication auth = 
@@ -147,13 +155,30 @@ public class AdminController {
                 return ResponseEntity.status(401).body(gson.toJson(error));
             }
             
-            logger.info("상점 목록 조회 요청 - 사용자: {}", auth.getName());
-            List<Store> stores = storeService.getAllStores();
-            logger.info("조회된 상점 수: {}", stores.size());
+            logger.info("상점 목록 조회 요청 - 사용자: {}, 페이지: {}, 크기: {}", auth.getName(), page, size);
+            
+            // 페이지 크기 제한 (최대 50개)
+            if (size > 50) {
+                size = 50;
+            }
+            if (size < 1) {
+                size = 10;
+            }
+            
+            Pageable pageable = PageRequest.of(page, size);
+            Page<Store> storePage = storeService.getStoresWithPagination(pageable);
+            
+            logger.info("조회된 상점 수: {} / 전체: {}", storePage.getNumberOfElements(), storePage.getTotalElements());
             
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
-            result.put("stores", stores);
+            result.put("stores", storePage.getContent());
+            result.put("currentPage", storePage.getNumber());
+            result.put("totalPages", storePage.getTotalPages());
+            result.put("totalElements", storePage.getTotalElements());
+            result.put("pageSize", storePage.getSize());
+            result.put("hasNext", storePage.hasNext());
+            result.put("hasPrevious", storePage.hasPrevious());
             
             return ResponseEntity.ok(gson.toJson(result));
         } catch (Exception e) {
