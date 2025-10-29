@@ -190,18 +190,22 @@ function drawExistingMarkers() {
     
     stores.forEach(store => {
         ctx.save();
-        ctx.fillStyle = '#4CAF50';
-        ctx.globalAlpha = 0.7;
+        
+        // 노란색 원형 마커
+        ctx.fillStyle = '#FFD700'; // 골드 노란색
+        ctx.globalAlpha = 0.9;
         ctx.beginPath();
-        ctx.arc(store.xCoordinate, store.yCoordinate, 10, 0, 2 * Math.PI);
+        ctx.arc(store.xCoordinate, store.yCoordinate, 12, 0, 2 * Math.PI);
         ctx.fill();
         
-        // 상점명 표시
-        ctx.fillStyle = '#333';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
+        // 검은색 테두리 추가 (더 잘 보이도록)
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
         ctx.globalAlpha = 1;
-        ctx.fillText(store.storeName, store.xCoordinate, store.yCoordinate - 15);
+        ctx.beginPath();
+        ctx.arc(store.xCoordinate, store.yCoordinate, 12, 0, 2 * Math.PI);
+        ctx.stroke();
+        
         ctx.restore();
     });
 }
@@ -465,14 +469,14 @@ async function editStore(storeId) {
     
     console.log('찾은 상점 정보:', store);
     
-    // 폼에 데이터 채우기
+    // 폼에 데이터 채우기 (null 또는 "null" 문자열 처리)
     document.getElementById('storeId').value = store.storeId || '';
-    document.getElementById('storeName').value = store.storeName || '';
-    document.getElementById('storeCode').value = store.storeCode || '';
-    document.getElementById('zoneNumber').value = store.zoneNumber || '';
-    document.getElementById('phoneNumber').value = store.phoneNumber || '';
-    document.getElementById('businessHours').value = store.businessHours || '';
-    document.getElementById('description').value = store.description || '';
+    document.getElementById('storeName').value = (store.storeName && store.storeName !== 'null') ? store.storeName : '';
+    document.getElementById('storeCode').value = (store.storeCode && store.storeCode !== 'null') ? store.storeCode : '';
+    document.getElementById('zoneNumber').value = (store.zoneNumber && store.zoneNumber !== 'null') ? store.zoneNumber : '1';
+    document.getElementById('phoneNumber').value = (store.phoneNumber && store.phoneNumber !== 'null') ? store.phoneNumber : '';
+    document.getElementById('businessHours').value = (store.businessHours && store.businessHours !== 'null') ? store.businessHours : '';
+    document.getElementById('description').value = (store.description && store.description !== 'null') ? store.description : '';
     
     // 좌표 설정
     selectedX = store.xCoordinate;

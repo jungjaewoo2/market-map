@@ -113,13 +113,13 @@
                 <div class="form-group">
                     <label class="form-label">전화번호</label>
                     <input type="tel" class="form-control" id="phoneNumber" name="phoneNumber" 
-                           placeholder="031-123-4567">
+                           placeholder="예: 02-1234-5678">
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">영업시간</label>
                     <input type="text" class="form-control" id="businessHours" name="businessHours" 
-                           placeholder="09:00 - 21:00">
+                           placeholder="예: 09:00 - 18:00">
                 </div>
                 
                 <div class="form-group">
